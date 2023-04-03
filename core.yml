@@ -1,0 +1,83 @@
+version: "3"
+
+services:
+  traefik:
+    image: traefik:v2.9
+    command:
+      - --api=true
+      - --api.dashboard=true
+      - --api.debug=true
+      - --providers.docker
+      - --providers.docker.swarmmode
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=public
+      - --entrypoints.web.address=:80
+      # - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.acmeresolver.acme.httpchallenge=true
+      - --certificatesresolvers.acmeresolver.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.acmeresolver.acme.email=contact@juetan.cn
+      - --certificatesresolvers.acmeresolver.acme.storage=/letsencrypt/acme.json
+    networks:
+      - network_public
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.dashboard.rule=Host(`router.dev.juetan.cn`)
+        - traefik.http.routers.dashboard.entrypoints=websecure
+        - traefik.http.routers.dashboard.tls.certresolver=acmeresolver
+        - traefik.http.routers.dashboard.service=api@internal
+        - traefik.http.services.api@internal.loadbalancer.server.port=8080
+        - traefik.http.routers.dashboard.middlewares=traefik-auth
+        - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$apr1$$8EVjn/nj$$GiLUZqcbueTFeD23SuB6x0"
+
+  agent:
+    image: portainer/agent:2.16.2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    networks:
+      - network_portainer
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.platform.os == linux]
+
+  server:
+    image: portainer/portainer-ce:2.16.2
+    command: -H tcp://tasks.agent:9001 --tlsskipverify
+    volumes:
+      - valume_portainer:/data
+    networks:
+      - network_portainer
+      - network_public
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.server.rule=Host(`server.dev.juetan.cn`)
+        - traefik.http.routers.server.entrypoints=websecure
+        - traefik.http.routers.server.tls.certresolver=acmeresolver
+        - traefik.http.services.server-service.loadbalancer.server.port=9000
+
+networks:
+  network_portainer:
+    driver: overlay
+  network_public:
+    external: true
+volumes:
+  valume_portainer:
+    external: true
