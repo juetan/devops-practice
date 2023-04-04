@@ -390,66 +390,44 @@ ENTRYPOINT ["java","-jar","/app.jar"]
 
 1. 在`Portainer`页面中，依次选择`Stacks`- `Add Stack`，填写`name`为`ssv`，内容如下：
 ```yaml
-version: '3.4'
-   
-services:
- server:
-   image: registry.dev.juetan.cn/project/ssvserver
-   networks:
-     - public
-   configs:
-     - source: ssv-server-config
-       target: /application.yml
-   deploy:
-     placement:
-       constraints:
-         - node.role==manager
-     labels:
-       - "traefik.port=8080"
-       - "traefik.enable=true"
-       - "traefik.docker.network=public"
-       - "traefik.frontend.rule=Host:ssv.app.juetan.cn;PathPrefixStrip:/api"
-       - "traefik.frontend.entryPoints=http, https"
-       - "traefik.frontend.redirect.entryPoint=https"
- web:
-   image: registry.dev.juetan.cn/project/ssvweb
-   networks:
-     - public
-   deploy:
-     placement:
-       constraints:
-         - node.role==manager
-     labels:
-       - "traefik.port=80"
-       - "traefik.enable=true"
-       - "traefik.docker.network=public"
-       - "traefik.frontend.rule=Host:ssv.app.juetan.cn;"
-       - "traefik.frontend.entryPoints=http, https"
-       - "traefik.frontend.redirect.entryPoint=https"
+version: "3"
 
-configs:
- ssv-server-config1:
-   external: true
+services:
+  server:
+    image: registry.dev.juetan.cn/server
+    networks:
+      - public
+    deploy:
+      placement:
+        constraints:
+          - node.role==manager
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.app1.rule=Host(`web.dev.juetan.cn`) && PathPrefix(`/api/`)
+        - traefik.http.routers.app1.entrypoints=websecure
+        - traefik.http.routers.app1.tls.certresolver=acmeresolver
+        - traefik.http.services.app1-service.loadbalancer.server.port=80
+  web:
+    image: registry.dev.juetan.cn/web
+    networks:
+      - public
+    deploy:
+      placement:
+        constraints:
+          - node.role==manager
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.app2.rule=Host(`web.dev.juetan.cn`)
+        - traefik.http.routers.app2.entrypoints=websecure
+        - traefik.http.routers.app2.tls.certresolver=acmeresolver
+        - traefik.http.services.app2-service.loadbalancer.server.port=80
 
 networks:
- public:
-   external: true
+  public:
+    external: true
 ```
 
-2. 在`Portainer`页面中，依次选择`Configs`- `Add Config`，填写`name`为`ssv-server-fonfig`，内容如下：
-```yaml
-spring:
-  datasource:
-      url: jdbc:mysql://mysql.dev.juetan.cn:13306/apptify?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&serverTimezone=Asia/Shanghai
-      username: root
-      password: cctomato
-logging:
-  config: classpath:logback-prod.xml
-mybatis:
-   mapperLocations: classpath:/mapper/*.xml
+1. 点击`Deploy the stack`按钮，等待服务部署完成，访问如下连接即可：
 ```
-
-3. 点击`Deploy the stack`按钮，等待服务部署完成，访问如下连接即可：
-```yaml
-http://ssv.app.juetan.cn
+http://apptify.app.juetan.cn
 ```

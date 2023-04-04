@@ -1,0 +1,16 @@
+kind: pipeline
+name: default
+steps:
+  - name: build
+    image: node:14.16.1
+    commands:
+      - npm install --registry=https://registry.npm.taobao.org
+      - npm run build
+  - name: docker
+    image: plugins/docker
+    settings:
+      repo: registry.dev.juetan.cn/web
+      registry: registry.dev.juetan.cn
+      insecure: true
+      force_tag: true
+      tags: latest

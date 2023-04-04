@@ -1,0 +1,35 @@
+version: "3"
+
+services:
+  server:
+    image: registry.dev.juetan.cn/server
+    networks:
+      - public
+    deploy:
+      placement:
+        constraints:
+          - node.role==manager
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.apptify-server.rule=Host(`web.dev.juetan.cn`) && PathPrefix(`/api/`)
+        - traefik.http.routers.apptify-server.entrypoints=websecure
+        - traefik.http.routers.apptify-server.tls.certresolver=acmeresolver
+        - traefik.http.services.apptify-server-service.loadbalancer.server.port=80
+  web:
+    image: registry.dev.juetan.cn/web
+    networks:
+      - public
+    deploy:
+      placement:
+        constraints:
+          - node.role==manager
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.apptify-web.rule=Host(`web.dev.juetan.cn`)
+        - traefik.http.routers.apptify-web.entrypoints=websecure
+        - traefik.http.routers.apptify-web.tls.certresolver=acmeresolver
+        - traefik.http.services.apptify-web-service.loadbalancer.server.port=80
+
+networks:
+  public:
+    external: true
