@@ -14,3 +14,16 @@ steps:
       insecure: true
       force_tag: true
       tags: latest
+  - name: deploy
+    image: appleboy/drone-ssh
+    settings:
+      host:
+        from_secret: DEPLOY_HOST
+      username:
+        from_secret: DEPLOY_USER
+      password:
+        from_secret: DEPLOY_PASSWORD
+      port:
+        from_secret: DEPLOY_PORT
+      script:
+        - docker service update --image registry.dev.juetan.cn/web:latest app1_web

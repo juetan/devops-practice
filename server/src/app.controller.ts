@@ -13,6 +13,6 @@ export class AppController {
 
   @Get('os')
   getOs(): string {
-    return platform();
+    return 'platform:' + platform();
   }
 }

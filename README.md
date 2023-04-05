@@ -1,4 +1,4 @@
-## 基本内容
+## 介绍
 实践内容：
 - 基于`docker`的容器部署平台(`docker`+`swarm`+`traefik`+`portainer`)。
 - 基于`docker registry`的容器管理平台。
@@ -18,12 +18,18 @@
 - 将`*.app.juetan.cn`解析到主服务器，用于部署应用的访问
 - 在主服务器上，新建`/docker`目录
 
-部署场景：
-- 开发服务器(`dev`)
-- 测试服务器(`test`)
-- 部署服务器(`pre`)
-- 生产服务器(`app`)
-- 演示服务器(`demo`)
+## 准备工作
+1. 在主服务器上，创建1个用户用于更新容器
+```
+useradd droneci -m -s /bin/bash
+passwd droneci
+usermod -a -G docker droneci
+su droneci
+docker service ls
+vim /etc/ssh/sshd_config 
+PasswordAuthentication yes
+service ssh restart
+```
 
 ## 实践步骤
 
@@ -55,13 +61,12 @@ docker stack deploy -c <config.yml> <stack_name>
 ```
 
 ### 创建核心服务
-
-- 在主服务器上，执行以下命令，创建公共网络：
+1. 在主服务器上，执行以下命令，初始化集群
 ```
-docker network create -d overlay network_public
+docker swarm init
 ```
 
-- 修改`/docker/core.toml`文件，添加内容如下
+2. 修改`/docker/core.toml`文件，添加内容如下
 ```yaml
 version: "3"
 
@@ -146,6 +151,11 @@ networks:
 volumes:
   valume_portainer:
     external: true
+```
+
+3. 运行以下命令启动
+```bash
+docker stack deploy -c /docker/core.yml core
 ```
 
 ### 创建开发服务
@@ -320,7 +330,7 @@ steps:
   - name: docker
     image: plugins/docker
     settings:
-      repo: registry.dev.juetan.cn/project/ssvweb
+      repo: registry.dev.juetan.cn/web
       registry: registry.dev.juetan.cn
       insecure: true
       force_tag: true
@@ -337,7 +347,7 @@ steps:
       port:
         from_secret: DEPLOY_PORT
       script:
-        - docker service update --image registry.dev.juetan.cn/project/ssvserver:latest ssv_server
+        - docker service update --image registry.dev.juetan.cn/web:latest app1_web
 ```
 
 2. 在根目录下新建`Dockerfile`文件，添加如下内容：
@@ -354,13 +364,14 @@ kind: pipeline
 name: default
 steps:
   - name: build
-    image: maven:3.3-jdk-8-alpine
+    image: node:latest
     commands:
-      - mvn clean package
+      - npm install --registry=https://registry.npm.taobao.org
+      - npm run build
   - name: docker
     image: plugins/docker
     settings:
-      repo: registry.dev.juetan.cn/project/ssvserver
+      repo: registry.dev.juetan.cn/server
       registry: registry.dev.juetan.cn
       insecure: true
       force_tag: true
@@ -377,14 +388,14 @@ steps:
       port:
         from_secret: DEPLOY_PORT
       script:
-        - docker service update --image registry.dev.juetan.cn/project/ssvserver:latest ssv_server
+        - docker service update --image registry.dev.juetan.cn/server:latest app1_server
 ```
 
 2. 在根目录下新建`Dockerfile`文件，添加如下内容：
 ```bash
-FROM openjdk:8-jre-alpine
-COPY ./target/example-2.0.0-RELEASE.jar /app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+FROM node:latest
+COPY . .
+ENTRYPOINT ["npm","run","start"]
 ```
 ### 部署配置
 
@@ -427,7 +438,18 @@ networks:
     external: true
 ```
 
+```
+useradd droneci -m -s /bin/bash
+passwd droneci
+usermod -a -G docker droneci
+su droneci
+docker service ls
+vim /etc/ssh/sshd_config 
+PasswordAuthentication yes
+service ssh restart
+```
+
 1. 点击`Deploy the stack`按钮，等待服务部署完成，访问如下连接即可：
 ```
-http://apptify.app.juetan.cn
+http://web.dev.juetan.cn
 ```
