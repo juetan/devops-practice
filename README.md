@@ -324,7 +324,7 @@ https://dbeaver.io/
 应用名称：DroneCI(可任意名称)
 重定向地址：https://ci.dev.juetan.cn/login
 ```
-6. 复制客户端ID和客户端密钥，更新core.yml文件，然后重启服务
+05. 复制客户端ID和客户端密钥，更新core.yml文件，然后重启服务
 ```
 # core.yml
 services:
@@ -458,17 +458,6 @@ services:
 networks:
   public:
     external: true
-```
-
-```
-useradd droneci -m -s /bin/bash
-passwd droneci
-usermod -a -G docker droneci
-su droneci
-docker service ls
-vim /etc/ssh/sshd_config 
-PasswordAuthentication yes
-service ssh restart
 ```
 
 02. 点击`Deploy the stack`按钮，等待服务部署完成，访问如下连接即可：
