@@ -1,13 +1,11 @@
 ## 介绍
-实践内容：
-- 基于`docker`的容器部署平台(`docker`+`swarm`+`traefik`+`portainer`)。
-- 基于`docker registry`的容器管理平台。
-- 基于`droneci`的代码构建平台。
-- 基于`gitea`的代码管理平台。
+基于`docker`，实现面向个人的CICD集成，包括：
+- 基于`docker`+`swarm`+`traefik`+`portainer`的容器平台。
+- 基于`mysql`+`gitea`+`droneci`+`docker registry`的构建平台。
 
-实践要求：
-- 至少1台服务器/虚拟机(最好2台，一台为主服务器，一台为子服务器，单台也行)
-- 至少1个域名(解析到国内服务器需备案)
+要求：
+- 至少1台安装好`docker`的服务器/虚拟机。备注：最好2台，一台为主服务器，一台为子服务器。
+- 至少1个域名。备注：域名解析到国内服务器需备案
 - 具备docker基本操作知识
 
 实践项目
@@ -18,55 +16,69 @@
 - 将`*.app.juetan.cn`解析到主服务器，用于部署应用的访问
 - 在主服务器上，新建`/docker`目录
 
-## 准备工作
-1. 在主服务器上，创建1个用户用于更新容器
+## 一、准备工作
+01. 初始化docker集群
 ```
-useradd droneci -m -s /bin/bash
-passwd droneci
-usermod -a -G docker droneci
-su droneci
-docker service ls
-vim /etc/ssh/sshd_config 
-PasswordAuthentication yes
-service ssh restart
-```
-
-## 实践步骤
-
-### 创建容器集群
-
-1. 在主服务器上，执行以下命令，初始化集群
-```
+# 初始化docker集群
 docker swarm init
-```
 
-2. 在主服务器上，执行以下命令，查看加入集群的令牌
-```
+# 在主服务器上查看加入令牌。备注：只有1台服务器跳过该步骤
 docker swarm join-token worker
-```
 
-3. 在子服务器上，执行以下命令，加入集群
-```
+# 在子服务器上使用令牌加入集群。备注：只有1台服务器跳过该步骤
 docker swarm jorin --token xx ip:port
 ```
 
-4. 在主服务器上，编写一个简单的服务
+02. 在主服务器上，创建必要的网络(`network`)。
 ```
-version: "3.4"
-```
-
-5. 在主服务器上，启动服务
-```
-docker stack deploy -c <config.yml> <stack_name>
+# 用于加入到外部访问的公共网络
+docker network create -d overlay network_public
 ```
 
-### 创建核心服务
-1. 在主服务器上，执行以下命令，初始化集群
+03. 在主服务器上，创建必要的数据卷(`volume`)。
 ```
-docker swarm init
+# 用于mysql的数据卷
+docker volume create volume_myqsl
+
+# 用于gitea的数据卷
+docker volume create volume_gitea
+
+# 用于droneci的数据卷
+docker volume create volume_drone
+
+# 用于docker registry的数据卷
+docker volume create volume_registry
 ```
 
-2. 修改`/docker/core.toml`文件，添加内容如下
+04. 在主服务器上，创建1个将分配给`droneci`使用的用户，用于远程更新容器
+```
+# 创建用户
+useradd droneci -m -s /bin/bash
+
+# 创建密码
+passwd droneci
+
+# 加入docker用户组
+usermod -a -G docker droneci
+
+# 切换到该用户
+su droneci
+
+# 测试是否有docker的执行权限
+docker service ls
+
+# 修改ssh的配置
+vim /etc/ssh/sshd_config
+
+# 允许使用密码登录
+PasswordAuthentication yes
+
+# 重启ssh服务
+service ssh restart
+```
+
+## 二、核心服务
+01. 修改`/docker/core.toml`文件，添加内容如下
 ```yaml
 version: "3"
 
@@ -153,22 +165,14 @@ volumes:
     external: true
 ```
 
-3. 运行以下命令启动
+02. 运行以下命令启动
 ```bash
 docker stack deploy -c /docker/core.yml core
 ```
 
-### 创建开发服务
+## 三、开发服务
 
-1. 在`Portainer`页面中，选择`volumes`，创建如下数据卷：
-```bash
-docker volume create volume_myqsl
-docker volume create volume_gitea
-docker volume create volume_drone
-docker volume create volume_registry
-```
-
-2. 在`Portainer`页面中，依次选择`Stacks`- `Add Stack`，填写`name`为`base`，内容如下：
+01. 在`Portainer`页面中，依次选择`Stacks`- `Add Stack`，填写`name`为`base`，内容如下：
 ```yaml
 version: '3'
 
@@ -304,20 +308,35 @@ volumes:
   volume_drone:
     external: true
 ```
-3. 点击`Deploy the stack`，等待服务部署完成。
-3. 使用`DBeaver`连接`Mysql`，创建数据库`gitea`
-3. 访问`https://git.dev.juetan.cn`完成创建，点击`设置-应用`创建应用如下：
+02. 点击`Deploy the stack`，等待服务部署完成。
+```
+可能会比较慢
+```
+03. 使用`DBeaver`或其他数据库管理软件连接`Mysql`，创建数据库`gitea`。
+```
+https://dbeaver.io/
+```
+04. 访问`https://git.dev.juetan.cn`完成创建，点击`设置-应用`创建应用如下：
 ```
 应用名称：DroneCI(可任意名称)
 重定向地址：https://ci.dev.juetan.cn/login
 ```
-6. 复制客户端ID和客户端密钥，更新stack.yml文件，然后重启服务
+6. 复制客户端ID和客户端密钥，更新core.yml文件，然后重启服务
+```
+# core.yml
+services:
+  drone-server:
+    image: drone/drone:latest
+    environment:
+      - DRONE_GITEA_CLIENT_ID=此处填写间客户端ID
+      - DRONE_GITEA_CLIENT_SECRET=此处填写客户端密钥
+```
 
-## 项目实践
+## 四、项目实践
 接下来是项目实践，部署一个前后端分离，前端为VueJS，后端为NestJS的项目。
 
-### 前端配置
-1. 在根目录下新建`.drone.yml`文件，添加如下内容：
+前端配置
+01. 在根目录下新建`.drone.yml`文件，添加如下内容：
 ```yaml
 kind: pipeline
 name: default
@@ -350,15 +369,15 @@ steps:
         - docker service update --image registry.dev.juetan.cn/web:latest app1_web
 ```
 
-2. 在根目录下新建`Dockerfile`文件，添加如下内容：
+02. 在根目录下新建`Dockerfile`文件，添加如下内容：
 ```bash
 FROM nginx
 COPY ./dist /usr/share/nginx/html
 ENTRYPOINT ["nginx","-g","daemon off;"]
 ```
 
-### 后端配置
-1. 在根目录下新建`.drone.yml`文件，添加如下内容：
+后端配置
+01. 在根目录下新建`.drone.yml`文件，添加如下内容：
 ```yaml
 kind: pipeline
 name: default
@@ -391,15 +410,15 @@ steps:
         - docker service update --image registry.dev.juetan.cn/server:latest app1_server
 ```
 
-2. 在根目录下新建`Dockerfile`文件，添加如下内容：
+02. 在根目录下新建`Dockerfile`文件，添加如下内容：
 ```bash
 FROM node:latest
 COPY . .
 ENTRYPOINT ["npm","run","start"]
 ```
-### 部署配置
+部署配置
 
-1. 在`Portainer`页面中，依次选择`Stacks`- `Add Stack`，填写`name`为`ssv`，内容如下：
+01. 在`Portainer`页面中，依次选择`Stacks`- `Add Stack`，填写`name`为`ssv`，内容如下：
 ```yaml
 version: "3"
 
@@ -449,7 +468,7 @@ PasswordAuthentication yes
 service ssh restart
 ```
 
-1. 点击`Deploy the stack`按钮，等待服务部署完成，访问如下连接即可：
+02. 点击`Deploy the stack`按钮，等待服务部署完成，访问如下连接即可：
 ```
 http://web.dev.juetan.cn
 ```
