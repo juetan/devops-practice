@@ -1,31 +1,31 @@
 ## 介绍
-基于`docker`，实现面向个人的CICD集成，包括：
-- 基于`docker`+`swarm`+`traefik`+`portainer`的容器平台。
-- 基于`mysql`+`gitea`+`droneci`+`docker registry`的构建平台。
+基于docker，实现面向个人的CICD集成，包括：
+- 基于 docker + swarm + traefik + portainer 的容器平台。
+- 基于 mysql + gitea + droneci + docker registry的构建平台。
 
 要求：
-- 至少1台安装好`docker`的服务器/虚拟机。备注：最好2台，一台为主服务器，一台为子服务器。
+- 至少1台安装好 docker 的服务器/虚拟机。备注：最好2台，一台为主服务器，一台为子服务器。
 - 至少1个域名。备注：域名解析到国内服务器需备案
 - 具备docker基本操作知识
 
 实践项目
-- NestJS + VueJS前后端分离项目
+- 前后端分离项目(VueJS + NestJS)
 
 准备工作
 - 将`*.dev.juetan.cn`解析到主服务器，用于基础设施的访问
 - 将`*.app.juetan.cn`解析到主服务器，用于部署应用的访问
 - 在主服务器上，新建`/docker`目录
 
-## 一、准备工作
+## [一] 准备工作
 01. 初始化docker集群
 ```
-# 初始化docker集群
+# 在主服务器上，初始化docker集群
 docker swarm init
 
-# 在主服务器上查看加入令牌。备注：只有1台服务器跳过该步骤
+# 在主服务器上，查看加入令牌。备注：只有1台服务器跳过该步骤
 docker swarm join-token worker
 
-# 在子服务器上使用令牌加入集群。备注：只有1台服务器跳过该步骤
+# 在子服务器上，使用令牌加入集群。备注：只有1台服务器跳过该步骤
 docker swarm jorin --token xx ip:port
 ```
 
@@ -37,6 +37,9 @@ docker network create -d overlay network_public
 
 03. 在主服务器上，创建必要的数据卷(`volume`)。
 ```
+# 用于portainer的数据卷
+docker volume create volume_portainer
+
 # 用于mysql的数据卷
 docker volume create volume_myqsl
 
@@ -77,7 +80,7 @@ PasswordAuthentication yes
 service ssh restart
 ```
 
-## 二、核心服务
+## [二] 核心服务
 01. 修改`/docker/core.toml`文件，添加内容如下
 ```yaml
 version: "3"
@@ -170,7 +173,7 @@ volumes:
 docker stack deploy -c /docker/core.yml core
 ```
 
-## 三、开发服务
+## [三] 开发服务
 
 01. 在`Portainer`页面中，依次选择`Stacks`- `Add Stack`，填写`name`为`base`，内容如下：
 ```yaml
@@ -332,7 +335,7 @@ services:
       - DRONE_GITEA_CLIENT_SECRET=此处填写客户端密钥
 ```
 
-## 四、项目实践
+## [四] 项目实践
 接下来是项目实践，部署一个前后端分离，前端为VueJS，后端为NestJS的项目。
 
 前端配置
